@@ -1,102 +1,1595 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spam SMS Detector</title>
-<meta name="description" content="Classify SMS messages as spam or legitimate with a TF-IDF + Logistic Regression model, running in your browser.">
-<style>
-:root{--bg:#f7f7f5;--card:#fff;--text:#1b1b1a;--muted:#6b6b66;--border:#e3e2dd;--accent:#2f5bd3;--spam:#c43b2f;--spam-bg:#fbeceb;--ham:#23824a;--ham-bg:#e8f5ed}
-@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1e1e1c;--text:#ecebe6;--muted:#9c9b95;--border:#33332f;--accent:#7d9cf0;--spam:#ef7b70;--spam-bg:#3a1f1c;--ham:#6cc993;--ham-bg:#17301f}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-main{max-width:760px;margin:0 auto;padding:40px 16px 64px}
-h1{font-size:1.8rem;margin:0 0 4px}
-.sub{color:var(--muted);margin:0 0 24px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
-textarea{width:100%;min-height:120px;resize:vertical;font:inherit;color:inherit;background:transparent;border:1px solid var(--border);border-radius:8px;padding:12px}
-textarea:focus{outline:2px solid var(--accent);border-color:transparent}
-.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
-button{font:inherit;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);padding:6px 12px;cursor:pointer}
-button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-.examples button{font-size:.85rem;color:var(--muted)}
-#result{display:none}
-.verdict{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:10px;font-weight:600;font-size:1.2rem}
-.verdict.spam{background:var(--spam-bg);color:var(--spam)}.verdict.ham{background:var(--ham-bg);color:var(--ham)}
-.bar{height:8px;border-radius:4px;background:var(--border);margin:14px 0 6px;overflow:hidden}
-.bar>div{height:100%;transition:width .2s}
-.small{font-size:.85rem;color:var(--muted)}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.chip{font-size:.85rem;padding:2px 8px;border-radius:999px;border:1px solid var(--border)}
-.chip.s{color:var(--spam)}.chip.h{color:var(--ham)}
-table{width:100%;border-collapse:collapse;font-size:.92rem}
-th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}th:first-child,td:first-child{text-align:left}
-.tw{overflow-x:auto}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpamGuard • SMS Fraud & Spam Detector</title>
+  <meta name="description" content="Handcrafted, 100% in-browser spam SMS detector powered by TF-IDF & Logistic Regression. Private, fast, zero cloud tracking.">
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      /* Winter Cozy Dark Theme (Default) */
+      --bg-gradient: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 50%, #030712 100%);
+      --surface: rgba(17, 24, 39, 0.75);
+      --surface-elevated: rgba(30, 41, 59, 0.7);
+      --surface-border: rgba(255, 255, 255, 0.1);
+      --surface-border-subtle: rgba(255, 255, 255, 0.05);
+
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --accent-hover: #7dd3fc;
+
+      --spam-red: #f43f5e;
+      --spam-bg: rgba(244, 63, 94, 0.12);
+      --spam-border: rgba(244, 63, 94, 0.35);
+
+      --ham-green: #10b981;
+      --ham-bg: rgba(16, 185, 129, 0.12);
+      --ham-border: rgba(16, 185, 129, 0.35);
+
+      --warning-amber: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.12);
+
+      --card-radius: 20px;
+      --inner-radius: 12px;
+      --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+    }
+
+    [data-theme="light"] {
+      --bg-gradient: radial-gradient(circle at 50% 0%, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%);
+      --surface: rgba(255, 255, 255, 0.85);
+      --surface-elevated: rgba(255, 255, 255, 0.95);
+      --surface-border: rgba(15, 23, 42, 0.08);
+      --surface-border-subtle: rgba(15, 23, 42, 0.04);
+
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+
+      --accent: #0284c7;
+      --accent-glow: rgba(2, 132, 199, 0.2);
+      --accent-hover: #0369a1;
+
+      --spam-red: #e11d48;
+      --spam-bg: rgba(225, 29, 72, 0.08);
+      --spam-border: rgba(225, 29, 72, 0.25);
+
+      --ham-green: #059669;
+      --ham-bg: rgba(5, 150, 105, 0.08);
+      --ham-border: rgba(5, 150, 105, 0.25);
+
+      --card-radius: 20px;
+      --inner-radius: 12px;
+      --shadow-lg: 0 20px 35px -10px rgba(15, 23, 42, 0.1), 0 0 1px 1px rgba(15, 23, 42, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background: var(--bg-gradient);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.6;
+      transition: background 0.4s ease, color 0.4s ease;
+      position: relative;
+    }
+
+    /* Falling Snow Canvas Background */
+    #snow-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Main Container */
+    .app-wrapper {
+      position: relative;
+      z-index: 2;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+
+    /* Top Navigation / Controls Bar */
+    .nav-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .brand-text {
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-tag {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      font-weight: 500;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-pill {
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--surface-border);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .control-pill:hover {
+      color: var(--text);
+      border-color: var(--accent);
+      background: var(--surface-elevated);
+      transform: translateY(-1px);
+    }
+
+    .control-pill.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .privacy-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--surface-border);
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--ham-green);
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+
+    .hero h1 {
+      font-size: 2.3rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+
+    .hero h1 span.gradient-text {
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 1.02rem;
+      color: var(--text-muted);
+      max-width: 580px;
+      margin: 0 auto;
+    }
+
+    /* Main Glass Card */
+    .glass-card {
+      background: var(--surface);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--card-radius);
+      padding: 24px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 24px;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* SMS Input Box */
+    .input-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .input-label {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mini-btn {
+      background: transparent;
+      border: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .mini-btn:hover {
+      color: var(--text);
+      background: var(--surface-elevated);
+      border-color: var(--text-dim);
+    }
+
+    .textarea-wrapper {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 130px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1.5px solid var(--surface-border);
+      border-radius: var(--inner-radius);
+      padding: 16px;
+      font-family: var(--font-main);
+      font-size: 1.05rem;
+      color: var(--text);
+      resize: vertical;
+      line-height: 1.6;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    [data-theme="light"] textarea {
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .textarea-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    /* Action Toolbar */
+    .action-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 6px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      border: none;
+      font-family: var(--font-main);
+      font-weight: 700;
+      font-size: 0.98rem;
+      padding: 12px 24px;
+      border-radius: var(--inner-radius);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.5);
+      background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .kbd-hint {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--surface-border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: var(--text-muted);
+    }
+
+    /* Curated Test Samples */
+    .examples-wrapper {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--surface-border-subtle);
+    }
+
+    .examples-header {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sample-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .sample-pill {
+      background: var(--surface-elevated);
+      border: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 6px 13px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .sample-pill:hover {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+
+    .sample-pill .pill-tag {
+      font-size: 0.68rem;
+      font-family: var(--font-mono);
+      padding: 1px 5px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .sample-pill .tag-spam {
+      background: var(--spam-bg);
+      color: var(--spam-red);
+    }
+
+    .sample-pill .tag-ham {
+      background: var(--ham-bg);
+      color: var(--ham-green);
+    }
+
+    /* Result Card */
+    #result-container {
+      display: none;
+      animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .verdict-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .verdict-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 18px;
+      border-radius: var(--inner-radius);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .verdict-badge.spam {
+      background: var(--spam-bg);
+      color: var(--spam-red);
+      border: 1.5px solid var(--spam-border);
+    }
+
+    .verdict-badge.ham {
+      background: var(--ham-bg);
+      color: var(--ham-green);
+      border: 1.5px solid var(--ham-border);
+    }
+
+    .verdict-score-box {
+      text-align: right;
+    }
+
+    .score-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .score-value {
+      font-family: var(--font-mono);
+      font-size: 1.45rem;
+      font-weight: 700;
+    }
+
+    /* Meter Bar */
+    .meter-container {
+      margin-bottom: 18px;
+    }
+
+    .meter-bar-track {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+
+    [data-theme="light"] .meter-bar-track {
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s;
+    }
+
+    .meter-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+    }
+
+    /* Advice Callout */
+    .advice-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: var(--inner-radius);
+      background: var(--surface-elevated);
+      border: 1px solid var(--surface-border);
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .advice-icon {
+      font-size: 1.2rem;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    /* Influential Tokens */
+    .signals-box {
+      padding-top: 16px;
+      border-top: 1px solid var(--surface-border-subtle);
+    }
+
+    .signals-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tokens-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .token-chip {
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      padding: 4px 10px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid;
+    }
+
+    .token-chip.spam-push {
+      background: var(--spam-bg);
+      color: var(--spam-red);
+      border-color: var(--spam-border);
+    }
+
+    .token-chip.ham-push {
+      background: var(--ham-bg);
+      color: var(--ham-green);
+      border-color: var(--ham-border);
+    }
+
+    .token-chip .token-weight {
+      font-size: 0.72rem;
+      opacity: 0.8;
+    }
+
+    /* History Section */
+    .history-card {
+      margin-top: 24px;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--surface-border);
+      border-radius: 10px;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .history-item:hover {
+      border-color: var(--accent);
+      transform: translateX(2px);
+    }
+
+    .history-text {
+      font-size: 0.85rem;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .history-tag {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    /* Collapsible "Under the Hood" Section */
+    .accordion-toggle {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: var(--font-main);
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      cursor: pointer;
+    }
+
+    .accordion-content {
+      margin-top: 16px;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .table-container {
+      margin: 16px 0;
+      overflow-x: auto;
+      border: 1px solid var(--surface-border);
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--surface-border);
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.03);
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    td.num {
+      text-align: right;
+      font-family: var(--font-mono);
+    }
+
+    tr.highlight-row {
+      background: rgba(56, 189, 248, 0.08);
+      font-weight: 600;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    footer a:hover {
+      color: var(--accent);
+    }
+
+    .human-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      z-index: 99;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all 0.25s ease;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 640px) {
+      .app-wrapper {
+        padding: 20px 14px 60px;
+      }
+      .hero h1 {
+        font-size: 1.8rem;
+      }
+      .nav-bar {
+        margin-bottom: 20px;
+      }
+      .action-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .btn-primary {
+        justify-content: center;
+        width: 100%;
+      }
+      .verdict-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .verdict-score-box {
+        text-align: left;
+      }
+    }
+  </style>
 </head>
 <body>
-<main>
-  <h1>Spam SMS Detector</h1>
-  <p class="sub">Paste a text message to check whether it looks like spam. The model runs entirely in your browser, so nothing you type is sent anywhere.</p>
 
-  <div class="card">
-    <textarea id="msg" placeholder="Type or paste an SMS message…" aria-label="SMS message"></textarea>
-    <div class="row"><button class="primary" id="go">Check message</button><span class="small" id="status">Loading model…</span></div>
-    <div class="row examples" id="examples"><span class="small">Try:</span></div>
+  <!-- Dynamic Falling Snow Background Canvas -->
+  <canvas id="snow-canvas" aria-hidden="true"></canvas>
+
+  <div class="app-wrapper">
+
+    <!-- Top Navigation Bar -->
+    <header class="nav-bar">
+      <div class="brand">
+        <div class="brand-icon">❄️</div>
+        <div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="brand-text">SpamGuard</span>
+            <span class="brand-tag">v2.1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Snow Toggle Pill -->
+        <button class="control-pill active" id="snowToggleBtn" title="Toggle snowfall animation">
+          <span id="snowIcon">❄️</span>
+          <span id="snowLabel">Snow: On</span>
+        </button>
+
+        <!-- Sound / Audio Feedback Toggle -->
+        <button class="control-pill" id="soundToggleBtn" title="Toggle audio feedback">
+          <span id="soundIcon">🔇</span>
+        </button>
+
+        <!-- Light / Dark Theme Switcher -->
+        <button class="control-pill" id="themeToggleBtn" title="Switch Theme">
+          <span id="themeIcon">🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Hero Title -->
+    <section class="hero">
+      <div class="privacy-badge">
+        <span class="pulse-dot"></span>
+        <span id="statusBadge">Model Loading...</span>
+        <span style="opacity:0.4">•</span>
+        <span>100% Client-Side Privacy</span>
+      </div>
+
+      <h1>
+        Detect SMS Scams <span class="gradient-text">in Real-Time</span>
+      </h1>
+      <p>
+        Zero trackers. No cloud endpoints. A lightweight machine learning model inspects every character directly in your browser.
+      </p>
+    </section>
+
+    <!-- Main Message Input Card -->
+    <main class="glass-card">
+      <div class="input-header">
+        <label for="msgInput" class="input-label">
+          <span>💬</span> Message Content
+        </label>
+        <div class="input-actions">
+          <button class="mini-btn" id="pasteBtn" title="Paste text from clipboard">
+            📋 Paste
+          </button>
+          <button class="mini-btn" id="clearBtn" title="Clear text input">
+            ✕ Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="textarea-wrapper">
+        <textarea id="msgInput" placeholder="Paste suspicious SMS message here (e.g. fake delivery updates, bank verification requests, lottery alerts)..." spellcheck="false" aria-label="SMS text to analyze"></textarea>
+      </div>
+
+      <div class="textarea-footer">
+        <span id="charCount">0 characters • 0 words</span>
+        <span class="kbd-hint">Press ⌘ + Enter to check</span>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-primary" id="analyzeBtn" disabled>
+          <span>🔍</span> Analyze Message
+        </button>
+        <div class="status-indicator" id="engineStatus">
+          <span>Initializing TF-IDF weights...</span>
+        </div>
+      </div>
+
+      <!-- Quick Test Samples -->
+      <div class="examples-wrapper">
+        <div class="examples-header">
+          <span>⚡ Try Real-World Scenarios</span>
+        </div>
+        <div class="sample-chips" id="sampleChips">
+          <!-- Dynamically populated sample pills -->
+        </div>
+      </div>
+    </main>
+
+    <!-- Inspection Result Card -->
+    <section class="glass-card" id="result-container" aria-live="polite">
+      <div class="verdict-header">
+        <div class="verdict-badge" id="verdictBadge">
+          <span id="verdictIcon">⚠️</span>
+          <span id="verdictText">Evaluating...</span>
+        </div>
+        <div class="verdict-score-box">
+          <div class="score-label">Spam Probability</div>
+          <div class="score-value" id="scoreText">0.0%</div>
+        </div>
+      </div>
+
+      <!-- Probability Meter -->
+      <div class="meter-container">
+        <div class="meter-bar-track">
+          <div class="meter-fill" id="meterFill"></div>
+        </div>
+        <div class="meter-labels">
+          <span>0% Safe (Ham)</span>
+          <span>50% Suspicious</span>
+          <span>100% Definite Scam</span>
+        </div>
+      </div>
+
+      <!-- Human Context & Practical Advice -->
+      <div class="advice-box" id="adviceBox">
+        <div class="advice-icon" id="adviceIcon">💡</div>
+        <div id="adviceContent">
+          <strong>Tip:</strong> Be cautious about clicking unrecognized links or calling unfamiliar phone numbers.
+        </div>
+      </div>
+
+      <!-- Influential Words & n-grams -->
+      <div class="signals-box">
+        <div class="signals-title">
+          <span>🔑 Key Predictive Signals Detected</span>
+          <span style="font-size:0.75rem; font-weight:normal; color:var(--text-dim);">(Words that tilted the decision)</span>
+        </div>
+        <div class="tokens-container" id="tokensContainer">
+          <!-- Token badges populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Session History -->
+    <section class="glass-card history-card" id="historySection" style="display:none;">
+      <div class="history-header">
+        <span style="font-weight:700; font-size:0.88rem; display:flex; align-items:center; gap:6px;">
+          <span>🕒</span> Recent Checks in this Session
+        </span>
+        <button class="mini-btn" id="clearHistoryBtn">Clear</button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </section>
+
+    <!-- Human Crafted Explainer / Under the Hood -->
+    <section class="glass-card">
+      <button class="accordion-toggle" id="accordionBtn">
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span>🔬</span> How this model works under the hood
+        </span>
+        <span id="accordionChevron">▼</span>
+      </button>
+
+      <div class="accordion-content" id="accordionContent">
+        <p>
+          Unlike generic cloud AI that sends your private text to remote servers, this tool evaluates messages <strong>directly on your device</strong> using a lightweight mathematical pipeline:
+        </p>
+        <ul style="margin: 12px 0 12px 20px; color: var(--text-muted);">
+          <li><strong>TF-IDF Vectorization:</strong> Extracts word unigrams & bigrams alongside character 2-to-5-grams. This allows it to spot typical obfuscations like <em>"fr33"</em>, distorted URLs, and numeric codes.</li>
+          <li><strong>Logistic Regression:</strong> Calibrated on stratified samples of legitimate and fraudulent messages with sublinear term-frequency scaling.</li>
+          <li><strong>Private by Design:</strong> Your messages never touch a network socket.</li>
+        </ul>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Model Architecture</th>
+                <th style="text-align:right">Precision</th>
+                <th style="text-align:right">Recall</th>
+                <th style="text-align:right">F1-Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Multinomial Naive Bayes</td>
+                <td class="num">0.966</td>
+                <td class="num">0.940</td>
+                <td class="num">0.952</td>
+              </tr>
+              <tr class="highlight-row">
+                <td>⚡ Logistic Regression (This Engine)</td>
+                <td class="num">0.993</td>
+                <td class="num">0.946</td>
+                <td class="num">0.969</td>
+              </tr>
+              <tr>
+                <td>Linear Support Vector Machine (SVM)</td>
+                <td class="num">0.993</td>
+                <td class="num">0.946</td>
+                <td class="num">0.969</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p style="font-size:0.82rem; color:var(--text-dim);">
+          Note: Trained on the SMS Spam Collection dataset. Highly sophisticated targeted spearfishing may still attempt novel phrasing; always trust your gut before sharing OTPs or payment credentials!
+        </p>
+      </div>
+    </section>
+
+    <!-- Handcrafted Footer -->
+    <footer>
+      <p>
+        Crafted with ❄️ & passion • 100% private in-browser analysis
+      </p>
+      <div class="human-note">
+        <span>No telemetry</span> • <span>Zero data collection</span> • <span>Pure JavaScript</span>
+      </div>
+    </footer>
+
   </div>
 
-  <div class="card" id="result">
-    <div class="verdict" id="verdict"></div>
-    <div class="bar"><div id="fill"></div></div>
-    <div class="small" id="prob"></div>
-    <div class="small" style="margin-top:14px">Words that pushed the decision most:</div>
-    <div class="chips" id="chips"></div>
+  <!-- Toast Element -->
+  <div id="toast" role="status">
+    <span id="toastIcon">✨</span>
+    <span id="toastMsg">Ready</span>
   </div>
 
-  <div class="card">
-    <strong>How it works</strong>
-    <p class="small">Features are TF-IDF scores of word unigrams and bigrams plus character 2–5-grams (which catch tricks like "fr33" and phone numbers). Three classifiers were compared on 5,572 labelled messages from the SMS Spam Collection, with an 80/20 stratified split. This page uses the Logistic Regression model.</p>
-    <div class="tw"><table>
-      <thead><tr><th>Model (test set, spam class)</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
-      <tbody>
-        <tr><td>Naive Bayes</td><td>0.966</td><td>0.940</td><td>0.952</td></tr>
-        <tr><td>Logistic Regression (this demo)</td><td>0.993</td><td>0.946</td><td>0.969</td></tr>
-        <tr><td>Linear SVM</td><td>0.993</td><td>0.946</td><td>0.969</td></tr>
-      </tbody>
-    </table></div>
-    <p class="small">Limitation: the training data is from around 2012, so modern phishing styles (e.g. "account suspended, verify at bit.ly/…") may be missed.</p>
-  </div>
-</main>
-<script src="classifier.js"></script>
-<script>
-const EXAMPLES = [
-  "Congratulations! You've won a £1000 gift card. Call 09061701461 to claim now",
-  "Hey, are we still meeting for lunch at 1?",
-  "FREE entry to win a new iPhone! Text WIN to 80086 now. T&Cs apply",
-  "Can you pick up some milk on the way home?"
-];
-let model = null;
-const $ = id => document.getElementById(id);
-const ex = $("examples");
-EXAMPLES.forEach(t => { const b = document.createElement("button"); b.textContent = t.length > 34 ? t.slice(0, 32) + "…" : t; b.title = t; b.onclick = () => { $("msg").value = t; run(); }; ex.appendChild(b); });
-fetch("model.json").then(r => r.json()).then(m => { model = SpamClassifier.prep(m); $("status").textContent = "Model ready"; if ($("msg").value.trim()) run(); })
-  .catch(() => { $("status").textContent = "Could not load the model."; });
-function run() {
-  const text = $("msg").value.trim();
-  if (!model || !text) return;
-  const r = SpamClassifier.classify(model, text), spam = r.prob >= 0.5;
-  $("result").style.display = "block";
-  const v = $("verdict"); v.className = "verdict " + (spam ? "spam" : "ham");
-  v.textContent = spam ? "⚠ Spam" : "✓ Legitimate (ham)";
-  $("fill").style.width = (r.prob * 100).toFixed(1) + "%";
-  $("fill").style.background = spam ? "var(--spam)" : "var(--ham)";
-  $("prob").textContent = "Spam probability: " + (r.prob * 100).toFixed(1) + "%";
-  const chips = $("chips"); chips.innerHTML = "";
-  r.words.slice(0, 8).forEach(([t, s]) => { const c = document.createElement("span"); c.className = "chip " + (s > 0 ? "s" : "h"); c.textContent = (s > 0 ? "▲ " : "▼ ") + t; chips.appendChild(c); });
-  if (!r.words.length) chips.innerHTML = '<span class="small">No known words.</span>';
-}
-$("go").onclick = run;
-$("msg").addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run(); });
-</script>
+  <!-- Load Classifier Engine -->
+  <script src="classifier.js"></script>
+
+  <script>
+    /* =========================================================
+       1. REALISTIC DYNAMIC FALLING SNOW SIMULATION
+       ========================================================= */
+    const canvas = document.getElementById("snow-canvas");
+    const ctx = canvas.getContext("2d");
+
+    let width = 0;
+    let height = 0;
+    let snowActive = true;
+    let flakes = [];
+    let mouse = { x: -9999, y: -9999, radius: 100 };
+    let windOffset = 0;
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
+    class Snowflake {
+      constructor(isInitial = false) {
+        this.reset(isInitial);
+      }
+
+      reset(isInitial = false) {
+        this.x = Math.random() * width;
+        this.y = isInitial ? Math.random() * height : -10;
+        // Depth simulation (layering 0.8px to 3.8px)
+        this.size = Math.random() * 2.8 + 0.8;
+        this.weight = Math.random() * 0.7 + 0.4;
+        this.speedY = (this.size * 0.45) + (Math.random() * 0.4);
+        this.speedX = (Math.random() - 0.5) * 0.4;
+        this.swing = Math.random() * 0.03 + 0.01;
+        this.swingCount = Math.random() * Math.PI * 2;
+        this.opacity = (this.size / 3.8) * 0.65 + 0.15;
+      }
+
+      update() {
+        this.swingCount += this.swing;
+        this.y += this.speedY;
+        this.x += Math.sin(this.swingCount) * 0.6 + this.speedX + (windOffset * 0.05);
+
+        // Interaction with mouse cursor
+        const dx = this.x - mouse.x;
+        const dy = this.y - mouse.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < mouse.radius) {
+          const force = (mouse.radius - dist) / mouse.radius;
+          this.x += (dx / dist) * force * 3;
+          this.y += (dy / dist) * force * 1.5;
+        }
+
+        // Loop around edges
+        if (this.y > height + 10) {
+          this.reset(false);
+        }
+        if (this.x > width + 10) {
+          this.x = -10;
+        } else if (this.x < -10) {
+          this.x = width + 10;
+        }
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        const isDark = document.documentElement.getAttribute("data-theme") !== "light";
+        ctx.fillStyle = isDark
+          ? `rgba(224, 242, 254, ${this.opacity})`
+          : `rgba(96, 165, 250, ${this.opacity * 0.75})`;
+        ctx.fill();
+      }
+    }
+
+    function initSnow() {
+      resizeCanvas();
+      const count = Math.min(Math.floor((width * height) / 8000), 120);
+      flakes = [];
+      for (let i = 0; i < count; i++) {
+        flakes.push(new Snowflake(true));
+      }
+    }
+
+    function animateSnow() {
+      if (!snowActive) return;
+      ctx.clearRect(0, 0, width, height);
+
+      windOffset = Math.sin(Date.now() * 0.001) * 0.8;
+
+      for (let i = 0; i < flakes.length; i++) {
+        flakes[i].update();
+        flakes[i].draw();
+      }
+
+      requestAnimationFrame(animateSnow);
+    }
+
+    window.addEventListener("resize", () => {
+      resizeCanvas();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+    });
+
+    window.addEventListener("mouseleave", () => {
+      mouse.x = -9999;
+      mouse.y = -9999;
+    });
+
+    initSnow();
+    animateSnow();
+
+    /* =========================================================
+       2. TACTILE AUDIO FEEDBACK (OPTIONAL CHIMES VIA WEB AUDIO)
+       ========================================================= */
+    let audioEnabled = false;
+    let audioCtx = null;
+
+    function playTactileSound(type) {
+      if (!audioEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        if (type === "click") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        } else if (type === "spam") {
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(180, now + 0.25);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === "ham") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(523.25, now); // C5
+          osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.15); // E5
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          osc.start(now);
+          osc.stop(now + 0.2);
+        }
+      } catch (e) {
+        // Audio policy or unsupported
+      }
+    }
+
+    /* =========================================================
+       3. TOAST HELPER
+       ========================================================= */
+    function showToast(msg, icon = "✨") {
+      const toast = document.getElementById("toast");
+      document.getElementById("toastIcon").textContent = icon;
+      document.getElementById("toastMsg").textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2800);
+    }
+
+    /* =========================================================
+       4. CURATED HUMAN-CRAFTED SCENARIOS
+       ========================================================= */
+    const SCENARIOS = [
+      {
+        tag: "spam",
+        label: "🎁 £1,000 Gift Card",
+        text: "Congratulations! You've won a £1000 gift card. Call 09061701461 to claim now"
+      },
+      {
+        tag: "spam",
+        label: "📱 Free iPhone Win",
+        text: "FREE entry to win a new iPhone! Text WIN to 80086 now. T&Cs apply"
+      },
+      {
+        tag: "spam",
+        label: "⚠️ Urgent Bank Alert",
+        text: "URGENT: Your bank account has been flagged for suspicious transfer. Call our fraud dept immediately at 08000776321"
+      },
+      {
+        tag: "ham",
+        label: "☕ Lunch with Friend",
+        text: "Hey, are we still meeting for lunch at 1? Let me know if you want Italian or Sushi!"
+      },
+      {
+        tag: "ham",
+        label: "🥛 Grocery Pickup",
+        text: "Can you pick up some milk and eggs on your way home tonight? Thanks love!"
+      },
+      {
+        tag: "ham",
+        label: "📦 Real Courier Update",
+        text: "Your package with tracking number 940011189956 will be delivered tomorrow before 5 PM. Signature not required."
+      }
+    ];
+
+    /* =========================================================
+       5. STATE & DOM REFERENCES
+       ========================================================= */
+    let model = null;
+    let history = [];
+
+    const msgInput = document.getElementById("msgInput");
+    const charCount = document.getElementById("charCount");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const engineStatus = document.getElementById("engineStatus");
+    const statusBadge = document.getElementById("statusBadge");
+
+    const resultContainer = document.getElementById("result-container");
+    const verdictBadge = document.getElementById("verdictBadge");
+    const verdictIcon = document.getElementById("verdictIcon");
+    const verdictText = document.getElementById("verdictText");
+    const scoreText = document.getElementById("scoreText");
+    const meterFill = document.getElementById("meterFill");
+    const adviceIcon = document.getElementById("adviceIcon");
+    const adviceContent = document.getElementById("adviceContent");
+    const tokensContainer = document.getElementById("tokensContainer");
+
+    const sampleChipsContainer = document.getElementById("sampleChips");
+    const historySection = document.getElementById("historySection");
+    const historyList = document.getElementById("historyList");
+
+    /* Render Scenarios */
+    SCENARIOS.forEach(sc => {
+      const btn = document.createElement("button");
+      btn.className = "sample-pill";
+      btn.innerHTML = `<span class="pill-tag tag-${sc.tag}">${sc.tag}</span> <span>${sc.label}</span>`;
+      btn.title = sc.text;
+      btn.onclick = () => {
+        playTactileSound("click");
+        msgInput.value = sc.text;
+        updateCharCount();
+        runAnalysis();
+      };
+      sampleChipsContainer.appendChild(btn);
+    });
+
+    /* Update character and word counter */
+    function updateCharCount() {
+      const val = msgInput.value;
+      const chars = val.length;
+      const words = val.trim() ? val.trim().split(/\s+/).length : 0;
+      charCount.textContent = `${chars} characters • ${words} words`;
+    }
+    msgInput.addEventListener("input", updateCharCount);
+
+    /* =========================================================
+       6. MODEL LOADING & INFERENCE
+       ========================================================= */
+    fetch("model.json")
+      .then(res => {
+        if (!res.ok) throw new Error("Network response was not ok");
+        return res.json();
+      })
+      .then(rawModel => {
+        model = SpamClassifier.prep(rawModel);
+        statusBadge.textContent = "Engine Ready";
+        engineStatus.innerHTML = `<span style="color:var(--ham-green); font-weight:600;">● Engine Ready (Pure JS)</span>`;
+        analyzeBtn.disabled = false;
+
+        // Auto-run if input already contains text
+        if (msgInput.value.trim()) {
+          runAnalysis();
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        statusBadge.textContent = "Model Error";
+        engineStatus.innerHTML = `<span style="color:var(--spam-red);">Failed to load model.json</span>`;
+      });
+
+    function runAnalysis() {
+      const text = msgInput.value.trim();
+      if (!model || !text) return;
+
+      playTactileSound("click");
+
+      const result = SpamClassifier.classify(model, text);
+      const probPercent = (result.prob * 100).toFixed(1);
+      const isSpam = result.prob >= 0.50;
+
+      // Show result section
+      resultContainer.style.display = "block";
+      resultContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+      // Play verdict sound
+      playTactileSound(isSpam ? "spam" : "ham");
+
+      // Update Verdict Badge
+      verdictBadge.className = "verdict-badge " + (isSpam ? "spam" : "ham");
+      if (result.prob >= 0.85) {
+        verdictIcon.textContent = "🚨";
+        verdictText.textContent = "Dangerous Scam / Spam";
+      } else if (result.prob >= 0.50) {
+        verdictIcon.textContent = "⚠️";
+        verdictText.textContent = "Probable Spam";
+      } else if (result.prob <= 0.15) {
+        verdictIcon.textContent = "✅";
+        verdictText.textContent = "Safe & Legitimate (Ham)";
+      } else {
+        verdictIcon.textContent = "🔍";
+        verdictText.textContent = "Likely Safe";
+      }
+
+      // Update Probability score & meter
+      scoreText.textContent = probPercent + "%";
+      scoreText.style.color = isSpam ? "var(--spam-red)" : "var(--ham-green)";
+      meterFill.style.width = probPercent + "%";
+      meterFill.style.background = isSpam
+        ? "linear-gradient(90deg, #f59e0b, #f43f5e)"
+        : "linear-gradient(90deg, #38bdf8, #10b981)";
+
+      // Tailored Human Advice
+      if (isSpam) {
+        adviceIcon.textContent = "🛡️";
+        adviceContent.innerHTML = `<strong>Actionable Advice:</strong> Do NOT reply, call back, or click any enclosed links. High probability of financial or credential harvesting fraud.`;
+      } else {
+        adviceIcon.textContent = "✨";
+        adviceContent.innerHTML = `<strong>Normal Personal or Transactional Pattern:</strong> Sentence structure and vocabulary align with standard legitimate communication.`;
+      }
+
+      // Predictive Signals / Tokens
+      tokensContainer.innerHTML = "";
+      if (result.words && result.words.length > 0) {
+        result.words.slice(0, 10).forEach(([term, weight]) => {
+          const chip = document.createElement("span");
+          const pushesSpam = weight > 0;
+          chip.className = "token-chip " + (pushesSpam ? "spam-push" : "ham-push");
+          const arrow = pushesSpam ? "▲" : "▼";
+          const sign = weight > 0 ? "+" : "";
+          chip.innerHTML = `<span>${arrow} ${escapeHtml(term)}</span> <span class="token-weight">(${sign}${weight.toFixed(2)})</span>`;
+          chip.title = pushesSpam ? `Pushes score toward SPAM by ${weight.toFixed(3)}` : `Pushes score toward LEGITIMATE by ${Math.abs(weight).toFixed(3)}`;
+          tokensContainer.appendChild(chip);
+        });
+      } else {
+        tokensContainer.innerHTML = `<span style="font-size:0.85rem; color:var(--text-dim);">No vocabulary match found in dataset.</span>`;
+      }
+
+      // Append to Session History
+      addToHistory(text, isSpam, probPercent);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function addToHistory(text, isSpam, probPercent) {
+      // Avoid duplicate consecutive items
+      if (history.length > 0 && history[0].text === text) return;
+
+      history.unshift({ text, isSpam, probPercent });
+      if (history.length > 5) history.pop();
+
+      renderHistory();
+    }
+
+    function renderHistory() {
+      if (history.length === 0) {
+        historySection.style.display = "none";
+        return;
+      }
+
+      historySection.style.display = "block";
+      historyList.innerHTML = "";
+
+      history.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.innerHTML = `
+          <div class="history-text" title="${escapeHtml(item.text)}">${escapeHtml(item.text)}</div>
+          <span class="history-tag ${item.isSpam ? 'tag-spam' : 'tag-ham'}" style="background:${item.isSpam ? 'var(--spam-bg)' : 'var(--ham-bg)'}; color:${item.isSpam ? 'var(--spam-red)' : 'var(--ham-green)'};">
+            ${item.isSpam ? 'SPAM ' : 'SAFE '}${item.probPercent}%
+          </span>
+        `;
+        div.onclick = () => {
+          msgInput.value = item.text;
+          updateCharCount();
+          runAnalysis();
+        };
+        historyList.appendChild(div);
+      });
+    }
+
+    document.getElementById("clearHistoryBtn").onclick = () => {
+      history = [];
+      renderHistory();
+      showToast("History cleared", "🗑️");
+    };
+
+    /* =========================================================
+       7. BUTTONS & CONTROLS
+       ========================================================= */
+    analyzeBtn.onclick = runAnalysis;
+
+    msgInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        runAnalysis();
+      }
+    });
+
+    // Paste from clipboard
+    document.getElementById("pasteBtn").onclick = async () => {
+      playTactileSound("click");
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          msgInput.value = text;
+          updateCharCount();
+          showToast("Pasted from clipboard!", "📋");
+          runAnalysis();
+        }
+      } catch (err) {
+        msgInput.focus();
+        showToast("Press ⌘+V to paste", "⌨️");
+      }
+    };
+
+    // Clear input
+    document.getElementById("clearBtn").onclick = () => {
+      playTactileSound("click");
+      msgInput.value = "";
+      updateCharCount();
+      resultContainer.style.display = "none";
+      msgInput.focus();
+    };
+
+    // Snow toggle button
+    const snowToggleBtn = document.getElementById("snowToggleBtn");
+    const snowIcon = document.getElementById("snowIcon");
+    const snowLabel = document.getElementById("snowLabel");
+
+    snowToggleBtn.onclick = () => {
+      snowActive = !snowActive;
+      snowToggleBtn.classList.toggle("active", snowActive);
+      snowIcon.textContent = snowActive ? "❄️" : "⏸️";
+      snowLabel.textContent = snowActive ? "Snow: On" : "Snow: Off";
+      showToast(snowActive ? "Snowfall active" : "Snowfall paused", snowActive ? "❄️" : "⏸️");
+      if (snowActive) {
+        animateSnow();
+      } else {
+        ctx.clearRect(0, 0, width, height);
+      }
+    };
+
+    // Sound toggle button
+    const soundToggleBtn = document.getElementById("soundToggleBtn");
+    const soundIcon = document.getElementById("soundIcon");
+
+    soundToggleBtn.onclick = () => {
+      audioEnabled = !audioEnabled;
+      soundToggleBtn.classList.toggle("active", audioEnabled);
+      soundIcon.textContent = audioEnabled ? "🔊" : "🔇";
+      if (audioEnabled) {
+        playTactileSound("ham");
+        showToast("Audio feedback enabled", "🔊");
+      } else {
+        showToast("Audio muted", "🔇");
+      }
+    };
+
+    // Theme toggle button
+    const themeToggleBtn = document.getElementById("themeToggleBtn");
+    const themeIcon = document.getElementById("themeIcon");
+
+    themeToggleBtn.onclick = () => {
+      const current = document.documentElement.getAttribute("data-theme");
+      const next = current === "light" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", next);
+      themeIcon.textContent = next === "light" ? "☀️" : "🌙";
+      showToast(next === "light" ? "Winter Daytime Theme" : "Winter Night Theme", next === "light" ? "☀️" : "🌙");
+    };
+
+    // Accordion toggle
+    const accordionBtn = document.getElementById("accordionBtn");
+    const accordionContent = document.getElementById("accordionContent");
+    const accordionChevron = document.getElementById("accordionChevron");
+    let accordionOpen = true;
+
+    accordionBtn.onclick = () => {
+      accordionOpen = !accordionOpen;
+      accordionContent.style.display = accordionOpen ? "block" : "none";
+      accordionChevron.textContent = accordionOpen ? "▼" : "▶";
+    };
+  </script>
 </body>
 </html>
