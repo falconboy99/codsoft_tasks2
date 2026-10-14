@@ -1,0 +1,40 @@
+
+== naive_bayes {'clf__alpha': 0.01}  CV-F1=0.9661
+              precision    recall  f1-score   support
+
+         ham     0.9907    0.9948    0.9928       966
+        spam     0.9655    0.9396    0.9524       149
+
+    accuracy                         0.9874      1115
+   macro avg     0.9781    0.9672    0.9726      1115
+weighted avg     0.9874    0.9874    0.9874      1115
+
+
+== logistic_regression {'clf__C': 10}  CV-F1=0.9711
+              precision    recall  f1-score   support
+
+         ham     0.9918    0.9990    0.9954       966
+        spam     0.9930    0.9463    0.9691       149
+
+    accuracy                         0.9919      1115
+   macro avg     0.9924    0.9726    0.9822      1115
+weighted avg     0.9919    0.9919    0.9918      1115
+
+
+== linear_svm {'clf__C': 0.3}  CV-F1=0.9718
+              precision    recall  f1-score   support
+
+         ham     0.9918    0.9990    0.9954       966
+        spam     0.9930    0.9463    0.9691       149
+
+    accuracy                         0.9919      1115
+   macro avg     0.9924    0.9726    0.9822      1115
+weighted avg     0.9919    0.9919    0.9918      1115
+
+
+                      accuracy  precision  recall      f1   cv_f1
+naive_bayes            0.9874     0.9655  0.9396  0.9524  0.9661
+logistic_regression    0.9919     0.9930  0.9463  0.9691  0.9711
+linear_svm             0.9919     0.9930  0.9463  0.9691  0.9718 
+
+Best model: linear_svm -> model/spam_classifier.joblib

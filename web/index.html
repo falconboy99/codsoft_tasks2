@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spam SMS Detector</title>
+<meta name="description" content="Classify SMS messages as spam or legitimate with a TF-IDF + Logistic Regression model, running in your browser.">
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--text:#1b1b1a;--muted:#6b6b66;--border:#e3e2dd;--accent:#2f5bd3;--spam:#c43b2f;--spam-bg:#fbeceb;--ham:#23824a;--ham-bg:#e8f5ed}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1e1e1c;--text:#ecebe6;--muted:#9c9b95;--border:#33332f;--accent:#7d9cf0;--spam:#ef7b70;--spam-bg:#3a1f1c;--ham:#6cc993;--ham-bg:#17301f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:40px 16px 64px}
+h1{font-size:1.8rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+textarea{width:100%;min-height:120px;resize:vertical;font:inherit;color:inherit;background:transparent;border:1px solid var(--border);border-radius:8px;padding:12px}
+textarea:focus{outline:2px solid var(--accent);border-color:transparent}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+button{font:inherit;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);padding:6px 12px;cursor:pointer}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.examples button{font-size:.85rem;color:var(--muted)}
+#result{display:none}
+.verdict{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:10px;font-weight:600;font-size:1.2rem}
+.verdict.spam{background:var(--spam-bg);color:var(--spam)}.verdict.ham{background:var(--ham-bg);color:var(--ham)}
+.bar{height:8px;border-radius:4px;background:var(--border);margin:14px 0 6px;overflow:hidden}
+.bar>div{height:100%;transition:width .2s}
+.small{font-size:.85rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:.85rem;padding:2px 8px;border-radius:999px;border:1px solid var(--border)}
+.chip.s{color:var(--spam)}.chip.h{color:var(--ham)}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}th:first-child,td:first-child{text-align:left}
+.tw{overflow-x:auto}
+</style>
+</head>
+<body>
+<main>
+  <h1>Spam SMS Detector</h1>
+  <p class="sub">Paste a text message to check whether it looks like spam. The model runs entirely in your browser, so nothing you type is sent anywhere.</p>
+
+  <div class="card">
+    <textarea id="msg" placeholder="Type or paste an SMS message…" aria-label="SMS message"></textarea>
+    <div class="row"><button class="primary" id="go">Check message</button><span class="small" id="status">Loading model…</span></div>
+    <div class="row examples" id="examples"><span class="small">Try:</span></div>
+  </div>
+
+  <div class="card" id="result">
+    <div class="verdict" id="verdict"></div>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="small" id="prob"></div>
+    <div class="small" style="margin-top:14px">Words that pushed the decision most:</div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="card">
+    <strong>How it works</strong>
+    <p class="small">Features are TF-IDF scores of word unigrams and bigrams plus character 2–5-grams (which catch tricks like "fr33" and phone numbers). Three classifiers were compared on 5,572 labelled messages from the SMS Spam Collection, with an 80/20 stratified split. This page uses the Logistic Regression model.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Model (test set, spam class)</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
+      <tbody>
+        <tr><td>Naive Bayes</td><td>0.966</td><td>0.940</td><td>0.952</td></tr>
+        <tr><td>Logistic Regression (this demo)</td><td>0.993</td><td>0.946</td><td>0.969</td></tr>
+        <tr><td>Linear SVM</td><td>0.993</td><td>0.946</td><td>0.969</td></tr>
+      </tbody>
+    </table></div>
+    <p class="small">Limitation: the training data is from around 2012, so modern phishing styles (e.g. "account suspended, verify at bit.ly/…") may be missed.</p>
+  </div>
+</main>
+<script src="classifier.js"></script>
+<script>
+const EXAMPLES = [
+  "Congratulations! You've won a £1000 gift card. Call 09061701461 to claim now",
+  "Hey, are we still meeting for lunch at 1?",
+  "FREE entry to win a new iPhone! Text WIN to 80086 now. T&Cs apply",
+  "Can you pick up some milk on the way home?"
+];
+let model = null;
+const $ = id => document.getElementById(id);
+const ex = $("examples");
+EXAMPLES.forEach(t => { const b = document.createElement("button"); b.textContent = t.length > 34 ? t.slice(0, 32) + "…" : t; b.title = t; b.onclick = () => { $("msg").value = t; run(); }; ex.appendChild(b); });
+fetch("model.json").then(r => r.json()).then(m => { model = SpamClassifier.prep(m); $("status").textContent = "Model ready"; if ($("msg").value.trim()) run(); })
+  .catch(() => { $("status").textContent = "Could not load the model."; });
+function run() {
+  const text = $("msg").value.trim();
+  if (!model || !text) return;
+  const r = SpamClassifier.classify(model, text), spam = r.prob >= 0.5;
+  $("result").style.display = "block";
+  const v = $("verdict"); v.className = "verdict " + (spam ? "spam" : "ham");
+  v.textContent = spam ? "⚠ Spam" : "✓ Legitimate (ham)";
+  $("fill").style.width = (r.prob * 100).toFixed(1) + "%";
+  $("fill").style.background = spam ? "var(--spam)" : "var(--ham)";
+  $("prob").textContent = "Spam probability: " + (r.prob * 100).toFixed(1) + "%";
+  const chips = $("chips"); chips.innerHTML = "";
+  r.words.slice(0, 8).forEach(([t, s]) => { const c = document.createElement("span"); c.className = "chip " + (s > 0 ? "s" : "h"); c.textContent = (s > 0 ? "▲ " : "▼ ") + t; chips.appendChild(c); });
+  if (!r.words.length) chips.innerHTML = '<span class="small">No known words.</span>';
+}
+$("go").onclick = run;
+$("msg").addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run(); });
+</script>
+</body>
+</html>

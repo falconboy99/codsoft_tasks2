@@ -1,0 +1,4 @@
+model/
+__pycache__/
+.netlify/
+results/web_reference_probs.txt
